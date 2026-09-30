@@ -3,191 +3,407 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>英文單字抽單字器</title>
+    <title>多益單字間隔重複記憶器</title>
     <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            padding: 20px; 
-            text-align: center; 
-            background: #f5f5f7; 
+        :root {
+            --bg-color: #f4f6f9;
+            --card-bg: #ffffff;
+            --primary-color: #007bff;
+            --text-color: #333;
         }
-        .card { 
-            background: white; 
-            padding: 24px; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
-            max-width: 420px; 
-            margin: 20px auto; 
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
         }
-        h1 { font-size: 22px; color: #1d1d1f; margin-bottom: 20px; }
-        .word { font-size: 34px; font-weight: bold; margin: 20px 0; color: #007aff; word-break: break-word; }
-        input[type="text"] { 
-            width: 80%; 
-            padding: 12px; 
-            font-size: 18px; 
-            border: 1px solid #ccc; 
-            border-radius: 8px; 
-            text-align: center; 
-            margin-bottom: 12px; 
-            outline: none;
+        .container {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
         }
-        input[type="text"]:focus { border-color: #007aff; }
-        button { 
-            background: #007aff; 
-            color: white; 
-            border: none; 
-            padding: 12px 20px; 
-            font-size: 16px; 
-            font-weight: 600;
-            border-radius: 8px; 
-            width: 85%; 
-            margin: 6px 0; 
+        h1 { font-size: 1.5rem; margin-bottom: 10px; color: #2c3e50; }
+        .word-card { margin: 20px 0; }
+        .english-word { font-size: 2.2rem; font-weight: bold; color: #1a73e8; margin-bottom: 8px; word-break: break-word; }
+        .level-tag { font-size: 0.9rem; color: #666; margin-bottom: 15px; }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            font-size: 1.2rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        input[type="text"]:focus { border-color: var(--primary-color); outline: none; }
+        button {
+            width: 100%;
+            padding: 12px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #fff;
+            background-color: var(--primary-color);
+            border: none;
+            border-radius: 8px;
             cursor: pointer;
+            margin-bottom: 8px;
         }
-        button.secondary { background: #e5e5ea; color: #1d1d1f; }
-        .status { margin-top: 12px; font-size: 15px; color: #555; }
-        .footer-note { font-size: 12px; color: #8e8e93; margin-top: 15px; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        button.btn-next { background-color: #28a745; }
+        .meanings { min-height: 24px; font-size: 1rem; color: #28a745; margin: 10px 0; }
+        .status { min-height: 24px; font-weight: bold; margin: 10px 0; }
+        .status.correct { color: #28a745; }
+        .status.wrong { color: #dc3545; }
+        .progress { font-size: 0.9rem; color: #777; margin-top: 15px; }
+        .control-panel {
+            margin-top: 25px;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+            text-align: left;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .file-input-wrapper { margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h1>英文單字抽單字器</h1>
-        <div class="word" id="wordLabel">載入資料庫中...</div>
-        <input type="text" id="answerInput" placeholder="輸入中文意思" disabled>
-        <br>
-        <button id="submitBtn" onclick="checkAnswer()" disabled>確認答案</button>
-        <button class="secondary" onclick="loadDatabase()">重新讀取 CSV</button>
-        
-        <div class="status" id="statusLabel"></div>
-        <div class="status" id="progressLabel"></div>
-        <div class="footer-note">資料庫：vocabulary.csv｜答錯 5 次重置單字</div>
+<div class="container">
+    <h1>英文單字抽單字器</h1>
+    
+    <div class="word-card">
+        <div id="englishWord" class="english-word">載入中...</div>
+        <div id="levelVar" class="level-tag">--</div>
     </div>
 
-    <script>
-        let words = [];
-        let remaining = [];
-        let current = null;
-        let wrongCount = 0;
-        let completedCount = 0;
+    <input type="text" id="answerInput" placeholder="輸入中文意思" autocomplete="off">
+    <button id="submitBtn" onclick="checkAnswer()">確認答案</button>
+    <button id="nextBtn" class="btn-next" onclick="nextAfterCorrect()" disabled>下一題</button>
 
-        // 綁定 Enter 鍵觸發送出答案
-        document.getElementById("answerInput").addEventListener("keyup", function(event) {
-            if (event.key === "Enter") {
+    <div id="meaningsVar" class="meanings"></div>
+    <div id="statusVar" class="status"></div>
+    <div id="progressVar" class="progress">--</div>
+
+    <div class="control-panel">
+        <div><b>匯入單字庫 (CSV)：</b></div>
+        <div class="file-input-wrapper">
+            <input type="file" id="csvFileInput" accept=".csv" onchange="handleFileUpload(event)">
+        </div>
+        <p style="margin-top:8px; line-height: 1.4;">
+            ※ 預設包含內建單字庫。<br>
+            ※ 自訂 CSV 欄位需包含 <code>English</code> 與 <code>Chinese</code>。<br>
+            ※ 熟悉度：陌生 → 偶爾錯 → 常錯 → 熟悉<br>
+            ※ 間隔複習：1→3→7→14→30天
+        </p>
+    </div>
+</div>
+
+<script>
+const DEFAULT_CSV = `English,Chinese
+nuclear,核能的
+reactor,反應爐|核反應爐
+radiation,輻射|放射線
+neutron,中子
+turbine,渦輪機|渦輪
+fission,核分裂
+fusion,核融合
+plasma,電漿|等離子體`;
+
+let words = [];
+let remaining = [];
+let current = null;
+let wrongCount = 0;
+let completedCount = 0;
+let totalCount = 0;
+let stats = {};
+let waitingForNext = false;
+
+// 頁面載入時初始化
+window.onload = function() {
+    loadStats();
+    loadDatabase();
+    
+    document.getElementById('answerInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            if (waitingForNext) {
+                nextAfterCorrect();
+            } else {
                 checkAnswer();
             }
-        });
+        }
+    });
+};
 
-        // 讀取外部 CSV 檔
-        async function loadDatabase() {
-            document.getElementById("wordLabel").innerText = "載入資料庫中...";
-            try {
-                // 加入時間戳記避免瀏覽器快取舊資料
-                const response = await fetch('vocabulary.csv?t=' + new Date().getTime());
-                if (!response.ok) {
-                    throw new Error("找不到 vocabulary.csv 檔案。");
-                }
-                const text = await response.text();
-                parseCSV(text);
-                
-                if (words.length === 0) {
-                    throw new Error("CSV 檔中沒有有效的單字。");
-                }
+function loadStats() {
+    const saved = localStorage.getItem('vocabulary_stats');
+    stats = saved ? JSON.parse(saved) : {};
+}
 
-                document.getElementById("answerInput").disabled = false;
-                document.getElementById("submitBtn").disabled = false;
-                startRound();
-            } catch (error) {
-                document.getElementById("wordLabel").innerText = "載入失敗";
-                document.getElementById("statusLabel").innerText = error.message;
+function saveStats() {
+    localStorage.setItem('vocabulary_stats', JSON.stringify(stats));
+}
+
+function loadDatabase(csvText = null) {
+    let source = csvText || localStorage.getItem('custom_csv') || DEFAULT_CSV;
+    words = parseCSV(source);
+    totalCount = words.length;
+    startRound();
+}
+
+function parseCSV(text) {
+    const lines = text.split(/\r\n|\n/);
+    if (lines.length < 2) return [];
+    
+    const headers = lines[0].split(',').map(h => h.trim());
+    const engIdx = headers.indexOf('English');
+    const chiIdx = headers.indexOf('Chinese');
+    
+    if (engIdx === -1 || chiIdx === -1) {
+        alert('CSV 必須包含 English 和 Chinese 欄位！');
+        return [];
+    }
+
+    let parsed = [];
+    for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const row = lines[i].split(',');
+        if (row.length > Math.max(engIdx, chiIdx)) {
+            const english = row[engIdx].trim();
+            const chinese = row[chiIdx].trim();
+            if (english && chinese) {
+                const answers = chinese.split(/[|｜/／、，,；;]+/).map(s => s.trim()).filter(Boolean);
+                parsed.push({ English: english, Chinese: chinese, answers: answers });
             }
         }
+    }
+    return parsed;
+}
 
-        // 解析 CSV 內容
-        function parseCSV(csvText) {
-            words = [];
-            const lines = csvText.split(/\r\n|\n/);
-            if (lines.length < 2) return;
+function getWordKey(word) {
+    return word.English.trim().toLowerCase();
+}
 
-            // 簡單處理 CSV 解析，並解析以 | 分隔的多個答案
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-                
-                const parts = line.split(',');
-                if (parts.length >= 2) {
-                    const english = parts[0].trim();
-                    const chinese = parts[1].trim();
-                    if (english && chinese) {
-                        const answers = chinese.split('|').map(a => a.trim()).filter(a => a);
-                        words.push({ English: english, answers: answers });
-                    }
-                }
-            }
+function getStat(word) {
+    const key = getWordKey(word);
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (!stats[key]) {
+        stats[key] = {
+            wrong_count: 0,
+            correct_count: 0,
+            wrong_streak: 0,
+            correct_streak: 0,
+            repetition_level: 0,
+            next_review: today,
+            last_review: null
+        };
+    }
+    return stats[key];
+}
+
+function getLevel(word) {
+    const stat = getStat(word);
+    if (stat.wrong_streak >= 2) return "常錯";
+    if (stat.wrong_count >= 1) return "偶爾錯";
+    if (stat.correct_streak >= 3) return "熟悉";
+    return "陌生";
+}
+
+function isDue(word) {
+    const stat = getStat(word);
+    const today = new Date().toISOString().split('T')[0];
+    return today >= stat.next_review;
+}
+
+function getReviewWeight(word) {
+    if (isDue(word)) return 8;
+    const stat = getStat(word);
+    const today = new Date();
+    const next = new Date(stat.next_review);
+    const daysLeft = Math.ceil((next - today) / (1000 * 60 * 60 * 24));
+    
+    if (daysLeft <= 1) return 5;
+    if (daysLeft <= 3) return 3;
+    return 1;
+}
+
+function getWeight(word) {
+    const levelWeights = { "常錯": 6, "偶爾錯": 4, "陌生": 2, "熟悉": 1 };
+    return levelWeights[getLevel(word)] * getReviewWeight(word);
+}
+
+function scheduleNextReview(word, correct) {
+    const stat = getStat(word);
+    const today = new Date();
+    
+    if (correct) {
+        stat.repetition_level = Math.min((stat.repetition_level || 0) + 1, 5);
+        const intervals = [0, 1, 3, 7, 14, 30];
+        const days = intervals[stat.repetition_level];
+        today.setDate(today.getDate() + days);
+    } else {
+        stat.repetition_level = Math.max((stat.repetition_level || 0) - 1, 0);
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    stat.last_review = todayStr;
+    stat.next_review = today.toISOString().split('T')[0];
+    saveStats();
+}
+
+function updateStatAfterCorrect(word) {
+    const stat = getStat(word);
+    stat.correct_count++;
+    stat.correct_streak++;
+    stat.wrong_streak = 0;
+    scheduleNextReview(word, true);
+}
+
+function updateStatAfterWrong(word) {
+    const stat = getStat(word);
+    stat.wrong_count++;
+    stat.wrong_streak++;
+    stat.correct_streak = 0;
+    scheduleNextReview(word, false);
+}
+
+function startRound() {
+    remaining = [...words];
+    completedCount = 0;
+    current = null;
+    wrongCount = 0;
+    waitingForNext = false;
+    nextWord();
+}
+
+function weightedPop() {
+    if (remaining.length === 0) return null;
+    const weights = remaining.map(w => getWeight(w));
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+    let randomNum = Math.random() * totalWeight;
+    
+    for (let i = 0; i < remaining.length; i++) {
+        if (randomNum < weights[i]) {
+            return remaining.splice(i, 1)[0];
         }
+        randomNum -= weights[i];
+    }
+    return remaining.pop();
+}
 
-        function startRound() {
-            remaining = [...words].sort(() => Math.random() - 0.5);
-            completedCount = 0;
+function nextWord() {
+    if (remaining.length === 0) {
+        finishRound();
+        return;
+    }
+
+    current = weightedPop();
+    wrongCount = 0;
+    waitingForNext = false;
+
+    document.getElementById('answerInput').value = "";
+    document.getElementById('meaningsVar').innerText = "";
+    document.getElementById('englishWord').innerText = current.English;
+    
+    const stat = getStat(current);
+    document.getElementById('levelVar').innerText = `目前熟悉度：${getLevel(current)} ｜ 下次複習：${stat.next_review}`;
+    document.getElementById('statusVar').innerText = "請輸入中文意思";
+    document.getElementById('statusVar').className = "status";
+
+    document.getElementById('answerInput').disabled = false;
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('nextBtn').disabled = true;
+    document.getElementById('answerInput').focus();
+
+    updateProgress();
+}
+
+function normalizeAnswer(text) {
+    return text.trim().replace(/[，。、；：]/g, "");
+}
+
+function checkAnswer() {
+    if (!current || waitingForNext) return;
+
+    const userInput = normalizeAnswer(document.getElementById('answerInput').value);
+    if (!userInput) {
+        document.getElementById('statusVar').innerText = "請先輸入答案。";
+        return;
+    }
+
+    const acceptedAnswers = current.answers.map(a => normalizeAnswer(a));
+
+    if (acceptedAnswers.includes(userInput)) {
+        updateStatAfterCorrect(current);
+        completedCount++;
+        
+        const stat = getStat(current);
+        document.getElementById('statusVar').innerText = "✓ 答對！";
+        document.getElementById('statusVar').className = "status correct";
+        document.getElementById('levelVar').innerText = `目前熟悉度：${getLevel(current)} ｜ 下次複習：${stat.next_review}`;
+        document.getElementById('meaningsVar').innerText = `其他／完整意思：${current.answers.join("、")}`;
+
+        document.getElementById('answerInput').disabled = true;
+        document.getElementById('submitBtn').disabled = true;
+        document.getElementById('nextBtn').disabled = false;
+        waitingForNext = true;
+
+        updateProgress();
+    } else {
+        updateStatAfterWrong(current);
+        wrongCount++;
+        const remainingChances = 5 - wrongCount;
+
+        if (wrongCount >= 5) {
+            remaining.push(current);
+            alert(`這個單字答錯 5 次。\n\n英文：${current.English}\n正確答案：${current.answers.join(" / ")}\n\n此單字已重新加入本輪，之後會再次抽取。`);
             nextWord();
+        } else {
+            document.getElementById('statusVar').innerText = `✗ 答錯，目前第 ${wrongCount} 次，還有 ${remainingChances} 次機會。`;
+            document.getElementById('statusVar').className = "status wrong";
+            document.getElementById('answerInput').value = "";
+            document.getElementById('answerInput').focus();
         }
+    }
+}
 
-        function nextWord() {
-            if (remaining.length === 0) {
-                alert(`🎉 完成！恭喜你完成 ${words.length} 個單字！\n重新開始下一輪。`);
-                startRound();
-                return;
-            }
+function nextAfterCorrect() {
+    if (!waitingForNext) return;
+    document.getElementById('nextBtn').disabled = true;
+    nextWord();
+}
 
-            current = remaining.pop();
-            wrongCount = 0;
-            
-            document.getElementById("wordLabel").innerText = current.English;
-            document.getElementById("answerInput").value = "";
-            document.getElementById("statusLabel").innerText = "請輸入中文意思";
-            document.getElementById("answerInput").focus();
-            updateProgress();
-        }
+function updateProgress() {
+    document.getElementById('progressVar').innerText = `本輪進度：${completedCount} / ${totalCount} 個`;
+}
 
-        function checkAnswer() {
-            if (!current) return;
+function finishRound() {
+    alert(`恭喜你完成 ${totalCount} 個單字！\n現在開始重新抽取下一輪。`);
+    startRound();
+}
 
-            const userInput = document.getElementById("answerInput").value.trim();
-            if (!userInput) {
-                document.getElementById("statusLabel").innerText = "請先輸入答案。";
-                return;
-            }
+function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
 
-            if (current.answers.includes(userInput)) {
-                completedCount++;
-                document.getElementById("statusLabel").innerText = "✓ 答對！";
-                updateProgress();
-                setTimeout(nextWord, 500);
-            } else {
-                wrongCount++;
-                const remainingChances = 5 - wrongCount;
-
-                if (wrongCount >= 5) {
-                    const correctAnswers = current.answers.join(" / ");
-                    alert(`答錯 5 次！\n\n英文：${current.English}\n正確答案：${correctAnswers}\n\n此單字會重新加入本輪抽籤。`);
-                    
-                    remaining.push(current);
-                    remaining.sort(() => Math.random() - 0.5);
-                    nextWord();
-                } else {
-                    document.getElementById("statusLabel").innerText = `✗ 答錯，目前第 ${wrongCount} 次，還有 ${remainingChances} 次機會。`;
-                    document.getElementById("answerInput").value = "";
-                    document.getElementById("answerInput").focus();
-                }
-            }
-        }
-
-        function updateProgress() {
-            document.getElementById("progressLabel").innerText = `本輪：${completedCount} / ${words.length} 個`;
-        }
-
-        // 初始化：開啟網頁時載入 CSV
-        loadDatabase();
-    </script>
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        localStorage.setItem('custom_csv', text);
+        loadDatabase(text);
+        alert('成功載入新單字庫！');
+    };
+    reader.readAsText(file);
+}
+</script>
 </body>
 </html>
